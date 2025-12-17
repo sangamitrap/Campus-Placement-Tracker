@@ -13,12 +13,12 @@ const BottomNav = () => {
     { path: '/dashboard', label: 'Home', icon: '🏠' },
     { path: '/jobs', label: 'Jobs', icon: '💼' },
     { path: '/applications', label: 'Applied', icon: '📋' },
+    { path: '/placement-status', label: 'Status', icon: '📊' },
     { path: '/profile', label: 'Profile', icon: '👤' }
   ];
 
   const interviewerNavItems = [
     { path: '/interviewer/dashboard', label: 'Dashboard', icon: '🏠' },
-    { path: '/interviewer/students', label: 'Students', icon: '👥' },
     { path: '/interviewer/messages', label: 'Messages', icon: '💬' }
   ];
 

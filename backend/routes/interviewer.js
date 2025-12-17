@@ -1,6 +1,5 @@
 import express from 'express';
-import { getInterviewerJobs, getStudentsForJob, getStudentDetails, getApplicationDetails } from '../controllers/interviewerController.js';
-import { updateApplicationStatus } from '../controllers/applicationController.js';
+import { getInterviewerJobs, getStudentsForJob, getStudentDetails, getApplicationDetails, updateApplicationStatus } from '../controllers/interviewerController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();

@@ -29,6 +29,24 @@ const Dashboard = () => {
     }
   };
 
+  const createQuickNotifications = async () => {
+    try {
+      await axios.post('/api/notifications/create-quick', {}, { withCredentials: true });
+      fetchDashboardData(); // Refresh to show new notifications
+    } catch (error) {
+      console.error('Error creating notifications:', error);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      await axios.put(`/api/notifications/${notificationId}/read`, {}, { withCredentials: true });
+      fetchDashboardData(); // Refresh to update read status
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -38,21 +56,50 @@ const Dashboard = () => {
       <Navbar />
       <EligibilityBanner />
       <div className="container" style={{ paddingBottom: '80px' }}>
-        <h1>Student Dashboard</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h1>Student Dashboard</h1>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={fetchDashboardData}
+              style={{ padding: '8px 16px' }}
+            >
+              🔄 Refresh
+            </button>
+            <button 
+              className="btn" 
+              onClick={createQuickNotifications}
+              style={{ padding: '8px 16px', backgroundColor: '#28a745', color: 'white' }}
+            >
+              🔔 Add Alerts
+            </button>
+          </div>
+        </div>
         
         <div className="grid grid-2">
           {/* Notifications Card */}
           <div className="card">
-            <h3>🔔 Notifications</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3>🔔 Notifications</h3>
+              <small style={{ color: '#666' }}>({notifications.length} total)</small>
+            </div>
             {notifications.length === 0 ? (
               <p>No new notifications</p>
             ) : (
               <div>
-                {notifications.slice(0, 5).map((notification) => (
-                  <div key={notification._id} style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
+                {notifications.map((notification) => (
+                  <div key={notification._id} style={{ 
+                    padding: '10px 0', 
+                    borderBottom: '1px solid #eee',
+                    cursor: 'pointer',
+                    backgroundColor: notification.isRead ? 'transparent' : '#f8f9fa'
+                  }}
+                  onClick={() => markNotificationAsRead(notification._id)}
+                  >
                     <p style={{ margin: 0, fontSize: '14px' }}>{notification.message}</p>
                     <small style={{ color: '#666' }}>
                       {new Date(notification.createdAt).toLocaleDateString()}
+                      {!notification.isRead && <span style={{ color: '#007bff', marginLeft: '10px' }}>• New</span>}
                     </small>
                   </div>
                 ))}

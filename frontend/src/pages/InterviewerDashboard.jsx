@@ -13,6 +13,7 @@ const InterviewerDashboard = () => {
     skills: ''
   });
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -24,6 +25,17 @@ const InterviewerDashboard = () => {
     }
   }, [selectedJob, filters]);
 
+  useEffect(() => {
+    // Auto-refresh every 30 seconds to get latest application updates
+    const interval = setInterval(() => {
+      if (selectedJob) {
+        fetchStudentsForJob();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [selectedJob]);
+
   const fetchDashboardData = async () => {
     try {
       const jobsResponse = await axios.get('/api/interviewer/jobs', { withCredentials: true });
@@ -31,6 +43,7 @@ const InterviewerDashboard = () => {
       if (jobsResponse.data.length > 0) {
         setSelectedJob(jobsResponse.data[0]._id);
       }
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -47,6 +60,7 @@ const InterviewerDashboard = () => {
       
       const response = await axios.get(`/api/interviewer/students?${params}`, { withCredentials: true });
       setStudents(response.data);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching students:', error);
     }
@@ -71,19 +85,27 @@ const InterviewerDashboard = () => {
         
         {/* Job Selection */}
         <div className="card">
-          <h3>Select Job Role</h3>
-          <select 
-            value={selectedJob} 
-            onChange={(e) => setSelectedJob(e.target.value)}
-            style={{ width: '100%', padding: '10px' }}
-          >
-            <option value="">Select a job</option>
-            {jobs.map((job) => (
-              <option key={job._id} value={job._id}>
-                {job.title} - {job.company}
-              </option>
-            ))}
-          </select>
+          <h3>📋 Select Job Role to Review Applications</h3>
+          <div className="form-group">
+            <label>Choose Job Position:</label>
+            <select 
+              value={selectedJob} 
+              onChange={(e) => setSelectedJob(e.target.value)}
+              style={{ width: '100%', padding: '12px', fontSize: '16px', border: '2px solid #007bff', borderRadius: '8px' }}
+            >
+              <option value="">-- Select a Job Position --</option>
+              {jobs.map((job) => (
+                <option key={job._id} value={job._id}>
+                  {job.title} at {job.company} ({job.location})
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedJob && (
+            <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+              <p style={{ margin: 0, fontSize: '14px' }}>✅ Job selected! Students who applied for this position will appear below.</p>
+            </div>
+          )}
         </div>
 
         {/* Advanced Filters */}
@@ -129,7 +151,23 @@ const InterviewerDashboard = () => {
 
         {/* Students List */}
         <div className="card">
-          <h3>Applied Students ({students.length})</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>Applied Students ({students.length})</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              {lastUpdated && (
+                <small style={{ color: '#666' }}>
+                  Last updated: {lastUpdated.toLocaleTimeString()}
+                </small>
+              )}
+              <button 
+                className="btn" 
+                onClick={() => selectedJob && fetchStudentsForJob()}
+                style={{ padding: '8px 16px', backgroundColor: '#28a745', color: 'white' }}
+              >
+                🔄 Refresh
+              </button>
+            </div>
+          </div>
           {students.length === 0 ? (
             <p>No students found for the selected criteria.</p>
           ) : (
@@ -156,6 +194,30 @@ const InterviewerDashboard = () => {
                         View Profile
                       </a>
                     </p>
+                  )}
+
+                  {/* Application Status Display */}
+                  {student.applicationStatus && (
+                    <div style={{ margin: '10px 0' }}>
+                      <span 
+                        className={`btn ${
+                          student.applicationStatus === 'selected' ? 'status-selected' : 
+                          student.applicationStatus === 'rejected' ? 'status-rejected' : 
+                          'status-pending'
+                        }`}
+                        style={{ fontSize: '12px', padding: '4px 8px' }}
+                      >
+                        {student.applicationStatus === 'selected' ? '✅ SELECTED' :
+                         student.applicationStatus === 'rejected' ? '❌ REJECTED' :
+                         student.applicationStatus === 'on-hold' ? '⏸️ ON HOLD' :
+                         '🕰️ PENDING'}
+                      </span>
+                      {student.interviewScore && (
+                        <span style={{ marginLeft: '10px', fontSize: '14px', fontWeight: 'bold' }}>
+                          Score: {student.interviewScore}/100
+                        </span>
+                      )}
+                    </div>
                   )}
 
                   <div style={{ marginTop: '15px' }}>

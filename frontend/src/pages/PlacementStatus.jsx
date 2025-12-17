@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
+import { useAuth } from '../context/AuthContext';
 
 const PlacementStatus = () => {
+  const { user } = useAuth();
   const [searchData, setSearchData] = useState({
     registerNumber: '',
     department: '',
@@ -11,8 +13,22 @@ const PlacementStatus = () => {
     company: ''
   });
   const [placementData, setPlacementData] = useState(null);
+  const [myApplications, setMyApplications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchMyApplications();
+  }, []);
+
+  const fetchMyApplications = async () => {
+    try {
+      const response = await axios.get('/api/applications/my-applications', { withCredentials: true });
+      setMyApplications(response.data);
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    }
+  };
 
   const handleChange = (e) => {
     setSearchData({
@@ -42,6 +58,52 @@ const PlacementStatus = () => {
       <Navbar />
       <div className="container" style={{ paddingBottom: '80px' }}>
         <h1>Placement Status & Feedback</h1>
+        
+        {/* My Applications Status */}
+        <div className="card">
+          <h3>My Application Status</h3>
+          {myApplications.length === 0 ? (
+            <p>No applications submitted yet.</p>
+          ) : (
+            <div className="grid grid-1">
+              {myApplications.map((application) => (
+                <div key={application._id} style={{ 
+                  padding: '15px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px', 
+                  marginBottom: '10px' 
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 5px 0' }}>{application.job?.title}</h4>
+                      <p style={{ margin: '0 0 5px 0', color: '#666' }}>{application.job?.company}</p>
+                      <p style={{ margin: 0, fontSize: '14px' }}>Applied: {new Date(application.appliedAt).toLocaleDateString()}</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span className={`btn ${
+                        application.status === 'selected' ? 'status-selected' : 
+                        application.status === 'rejected' ? 'status-rejected' : 
+                        'status-pending'
+                      }`} style={{ fontSize: '12px', padding: '4px 8px' }}>
+                        {application.status.toUpperCase()}
+                      </span>
+                      {application.interviewScore && (
+                        <p style={{ margin: '5px 0 0 0', fontSize: '14px', fontWeight: 'bold' }}>
+                          Score: {application.interviewScore}/100
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {application.feedback && (
+                    <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                      <strong>Feedback:</strong> {application.feedback}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         
         <div className="card">
           <h3>Search Placement Status</h3>

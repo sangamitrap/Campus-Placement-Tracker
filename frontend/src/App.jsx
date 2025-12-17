@@ -18,6 +18,7 @@ import PlacementStatus from './pages/PlacementStatus';
 // Interviewer Pages
 import InterviewerDashboard from './pages/InterviewerDashboard';
 import StudentDetails from './pages/StudentDetails';
+import Messages from './pages/Messages';
 
 function App() {
   return (
@@ -86,6 +87,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="interviewer">
                   <StudentDetails />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/interviewer/messages" 
+              element={
+                <ProtectedRoute requiredRole="interviewer">
+                  <Messages />
                 </ProtectedRoute>
               } 
             />

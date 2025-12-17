@@ -1,6 +1,7 @@
 import Application from '../models/Application.js';
 import Job from '../models/Job.js';
 import User from '../models/User.js';
+import Notification from '../models/Notification.js';
 
 const checkEligibility = (user, job) => {
   return user.cgpa >= job.minCGPA && 
@@ -28,6 +29,14 @@ export const applyToJob = async (req, res) => {
 
     const application = await Application.create({ student: userId, job: jobId });
     await Job.findByIdAndUpdate(jobId, { $push: { applicants: userId } });
+
+    // Create notification for successful application
+    await Notification.create({
+      recipient: userId,
+      message: `Your application for ${job.title} at ${job.company} has been submitted successfully.`,
+      type: 'application_submitted',
+      relatedJob: jobId
+    });
 
     res.status(201).json({ message: 'Application submitted successfully', application });
   } catch (error) {
@@ -65,6 +74,24 @@ export const updateApplicationStatus = async (req, res) => {
     );
 
     if (!application) return res.status(404).json({ message: 'Application not found' });
+
+    // Create notification for status update
+    const job = await Job.findById(jobId);
+    const statusMessages = {
+      selected: `Congratulations! You have been selected for ${job.title} at ${job.company}.`,
+      rejected: `Your application for ${job.title} at ${job.company} was not successful this time.`,
+      shortlisted: `Good news! You have been shortlisted for ${job.title} at ${job.company}.`,
+      interview_scheduled: `Interview scheduled for ${job.title} at ${job.company}. Check your email for details.`
+    };
+
+    if (statusMessages[status]) {
+      await Notification.create({
+        recipient: studentId,
+        message: statusMessages[status],
+        type: 'status_update',
+        relatedJob: jobId
+      });
+    }
 
     res.json({ message: 'Application status updated', application });
   } catch (error) {

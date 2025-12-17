@@ -18,6 +18,8 @@ const Jobs = () => {
   });
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [jobsPerPage] = useState(12);
   
   const { user } = useAuth();
 
@@ -28,6 +30,7 @@ const Jobs = () => {
 
   useEffect(() => {
     applyFilters();
+    setCurrentPage(1); // Reset to first page when filters change
   }, [jobs, filters]);
 
   const fetchJobs = async () => {
@@ -91,6 +94,12 @@ const Jobs = () => {
     });
   };
 
+  const getCurrentPageJobs = () => {
+    const indexOfLastJob = currentPage * jobsPerPage;
+    const indexOfFirstJob = indexOfLastJob - jobsPerPage;
+    return filteredJobs.slice(indexOfFirstJob, indexOfLastJob);
+  };
+
   const handleApply = async (jobId) => {
     try {
       await axios.post(`/api/applications/apply/${jobId}`, {}, { withCredentials: true });
@@ -152,7 +161,7 @@ const Jobs = () => {
 
         {/* Jobs List */}
         <div className="grid grid-2">
-          {filteredJobs.map((job) => {
+          {getCurrentPageJobs().map((job) => {
             const isEligible = userProfile ? checkEligibility(userProfile, job) : false;
             const hasApplied = job.applicants?.includes(user?.id);
             
@@ -198,6 +207,32 @@ const Jobs = () => {
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {filteredJobs.length > jobsPerPage && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '20px' }}>
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="btn"
+            >
+              Previous
+            </button>
+            
+            <span style={{ margin: '0 15px' }}>
+              Page {currentPage} of {Math.ceil(filteredJobs.length / jobsPerPage)} 
+              ({filteredJobs.length} jobs)
+            </span>
+            
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredJobs.length / jobsPerPage)))}
+              disabled={currentPage === Math.ceil(filteredJobs.length / jobsPerPage)}
+              className="btn"
+            >
+              Next
+            </button>
+          </div>
+        )}
 
         {filteredJobs.length === 0 && (
           <div className="card" style={{ textAlign: 'center' }}>
