@@ -4,46 +4,26 @@ import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 
 const InterviewerDashboard = () => {
-  const [students, setStudents] = useState([]);
+  const [applications, setApplications] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState('');
-  const [filters, setFilters] = useState({
-    department: '',
-    minCGPA: '',
-    skills: ''
-  });
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [stats, setStats] = useState({ total: 0, pending: 0, selected: 0, rejected: 0 });
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   useEffect(() => {
-    if (selectedJob) {
-      fetchStudentsForJob();
-    }
-  }, [selectedJob, filters]);
-
-  useEffect(() => {
-    // Auto-refresh every 30 seconds to get latest application updates
-    const interval = setInterval(() => {
-      if (selectedJob) {
-        fetchStudentsForJob();
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [selectedJob]);
+    fetchApplications();
+  }, [selectedJob, selectedStatus]);
 
   const fetchDashboardData = async () => {
     try {
       const jobsResponse = await axios.get('/api/interviewer/jobs', { withCredentials: true });
       setJobs(jobsResponse.data);
-      if (jobsResponse.data.length > 0) {
-        setSelectedJob(jobsResponse.data[0]._id);
-      }
-      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -51,27 +31,50 @@ const InterviewerDashboard = () => {
     }
   };
 
-  const fetchStudentsForJob = async () => {
+  const fetchApplications = async () => {
     try {
-      const params = new URLSearchParams({
-        jobId: selectedJob,
-        ...filters
-      });
+      const params = new URLSearchParams();
+      if (selectedJob) params.append('jobId', selectedJob);
+      if (selectedStatus) params.append('status', selectedStatus);
       
-      const response = await axios.get(`/api/interviewer/students?${params}`, { withCredentials: true });
-      setStudents(response.data);
-      setLastUpdated(new Date());
+      const response = await axios.get(`/api/interviewer/applications?${params}`, { withCredentials: true });
+      setApplications(response.data);
+      
+      // Calculate stats
+      const total = response.data.length;
+      const pending = response.data.filter(app => app.status === 'pending').length;
+      const selected = response.data.filter(app => app.status === 'selected').length;
+      const rejected = response.data.filter(app => app.status === 'rejected').length;
+      setStats({ total, pending, selected, rejected });
     } catch (error) {
-      console.error('Error fetching students:', error);
+      console.error('Error fetching applications:', error);
     }
   };
 
-  const handleFilterChange = (e) => {
-    setFilters({
-      ...filters,
-      [e.target.name]: e.target.value
-    });
+  const quickUpdateStatus = async (applicationId, newStatus) => {
+    try {
+      await axios.put(`/api/interviewer/quick-update/${applicationId}`, 
+        { status: newStatus }, 
+        { withCredentials: true }
+      );
+      fetchApplications(); // Refresh data
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
   };
+
+  const filteredApplications = applications.filter(app => {
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        app.student.firstName.toLowerCase().includes(searchLower) ||
+        app.student.lastName.toLowerCase().includes(searchLower) ||
+        app.student.registerNumber.toLowerCase().includes(searchLower) ||
+        app.student.department.toLowerCase().includes(searchLower)
+      );
+    }
+    return true;
+  });
 
   if (loading) {
     return <div>Loading...</div>;
@@ -81,161 +84,192 @@ const InterviewerDashboard = () => {
     <div>
       <Navbar />
       <div className="container" style={{ paddingBottom: '80px' }}>
-        <h1>Interviewer Dashboard</h1>
-        
-        {/* Job Selection */}
-        <div className="card">
-          <h3>📋 Select Job Role to Review Applications</h3>
-          <div className="form-group">
-            <label>Choose Job Position:</label>
-            <select 
-              value={selectedJob} 
-              onChange={(e) => setSelectedJob(e.target.value)}
-              style={{ width: '100%', padding: '12px', fontSize: '16px', border: '2px solid #007bff', borderRadius: '8px' }}
-            >
-              <option value="">-- Select a Job Position --</option>
-              {jobs.map((job) => (
-                <option key={job._id} value={job._id}>
-                  {job.title} at {job.company} ({job.location})
-                </option>
-              ))}
-            </select>
-          </div>
-          {selectedJob && (
-            <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
-              <p style={{ margin: 0, fontSize: '14px' }}>✅ Job selected! Students who applied for this position will appear below.</p>
-            </div>
-          )}
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <h1 style={{ color: '#2c3e50', marginBottom: '10px' }}>🎯 Interviewer Dashboard</h1>
+          <p style={{ color: '#7f8c8d', fontSize: '18px' }}>Manage Applications & Evaluate Candidates</p>
         </div>
 
-        {/* Advanced Filters */}
+        {/* Statistics Cards */}
+        <div className="grid grid-4" style={{ marginBottom: '30px' }}>
+          <div className="card" style={{ textAlign: 'center', backgroundColor: '#3498db', color: 'white' }}>
+            <h2 style={{ margin: '0 0 5px 0' }}>{stats.total}</h2>
+            <p style={{ margin: 0 }}>📋 Total Applications</p>
+          </div>
+          <div className="card" style={{ textAlign: 'center', backgroundColor: '#f39c12', color: 'white' }}>
+            <h2 style={{ margin: '0 0 5px 0' }}>{stats.pending}</h2>
+            <p style={{ margin: 0 }}>⏳ Pending Review</p>
+          </div>
+          <div className="card" style={{ textAlign: 'center', backgroundColor: '#27ae60', color: 'white' }}>
+            <h2 style={{ margin: '0 0 5px 0' }}>{stats.selected}</h2>
+            <p style={{ margin: 0 }}>✅ Selected</p>
+          </div>
+          <div className="card" style={{ textAlign: 'center', backgroundColor: '#e74c3c', color: 'white' }}>
+            <h2 style={{ margin: '0 0 5px 0' }}>{stats.rejected}</h2>
+            <p style={{ margin: 0 }}>❌ Rejected</p>
+          </div>
+        </div>
+        
+        {/* Filters */}
         <div className="card">
-          <h3>Filter Students</h3>
+          <h3>🔍 Filter Applications</h3>
           <div className="grid grid-3">
             <div className="form-group">
-              <label>Department</label>
-              <select name="department" value={filters.department} onChange={handleFilterChange}>
-                <option value="">All Departments</option>
-                <option value="CSE">CSE</option>
-                <option value="ECE">ECE</option>
-                <option value="EEE">EEE</option>
-                <option value="MECH">MECH</option>
-                <option value="CIVIL">CIVIL</option>
+              <label>Job Position:</label>
+              <select 
+                value={selectedJob} 
+                onChange={(e) => setSelectedJob(e.target.value)}
+                style={{ padding: '10px', borderRadius: '6px', border: '2px solid #3498db' }}
+              >
+                <option value="">All Jobs</option>
+                {jobs.map((job) => (
+                  <option key={job._id} value={job._id}>
+                    {job.title} - {job.company}
+                  </option>
+                ))}
               </select>
             </div>
-
+            
             <div className="form-group">
-              <label>Minimum CGPA</label>
-              <input
-                type="number"
-                step="0.1"
-                name="minCGPA"
-                value={filters.minCGPA}
-                onChange={handleFilterChange}
-                placeholder="e.g., 7.5"
-              />
+              <label>Application Status:</label>
+              <select 
+                value={selectedStatus} 
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                style={{ padding: '10px', borderRadius: '6px', border: '2px solid #27ae60' }}
+              >
+                <option value="">All Status</option>
+                <option value="pending">⏳ Pending</option>
+                <option value="selected">✅ Selected</option>
+                <option value="rejected">❌ Rejected</option>
+                <option value="on-hold">⏸️ On Hold</option>
+              </select>
             </div>
-
+            
             <div className="form-group">
-              <label>Skills</label>
+              <label>Search Student:</label>
               <input
                 type="text"
-                name="skills"
-                value={filters.skills}
-                onChange={handleFilterChange}
-                placeholder="e.g., React, Python"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Name, Register No, Department..."
+                style={{ padding: '10px', borderRadius: '6px', border: '2px solid #f39c12' }}
               />
             </div>
           </div>
         </div>
 
-        {/* Students List */}
+        {/* Applications List */}
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Applied Students ({students.length})</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              {lastUpdated && (
-                <small style={{ color: '#666' }}>
-                  Last updated: {lastUpdated.toLocaleTimeString()}
-                </small>
-              )}
-              <button 
-                className="btn" 
-                onClick={() => selectedJob && fetchStudentsForJob()}
-                style={{ padding: '8px 16px', backgroundColor: '#28a745', color: 'white' }}
-              >
-                🔄 Refresh
-              </button>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3>📋 Applications ({filteredApplications.length})</h3>
+            <button 
+              className="btn" 
+              onClick={fetchApplications}
+              style={{ padding: '8px 16px', backgroundColor: '#3498db', color: 'white' }}
+            >
+              🔄 Refresh
+            </button>
           </div>
-          {students.length === 0 ? (
-            <p>No students found for the selected criteria.</p>
+          
+          {filteredApplications.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#7f8c8d' }}>
+              <h3>📭 No Applications Found</h3>
+              <p>No applications match your current filters.</p>
+            </div>
           ) : (
-            <div className="grid grid-2">
-              {students.map((student) => (
-                <div key={student._id} className="card" style={{ margin: '10px 0' }}>
-                  <h4>{student.firstName} {student.lastName}</h4>
-                  <p><strong>Register No:</strong> {student.registerNumber}</p>
-                  <p><strong>Department:</strong> {student.department} - {student.section}</p>
-                  <p><strong>CGPA:</strong> {student.cgpa}</p>
-                  <p><strong>Backlogs:</strong> {student.backlogs}</p>
-                  
-                  {student.skills && student.skills.length > 0 && (
-                    <p><strong>Skills:</strong> {student.skills.join(', ')}</p>
-                  )}
-                  
-                  {student.areaOfInterest && student.areaOfInterest.length > 0 && (
-                    <p><strong>Interests:</strong> {student.areaOfInterest.join(', ')}</p>
-                  )}
-                  
-                  {student.linkedinUrl && (
-                    <p><strong>LinkedIn:</strong> 
-                      <a href={student.linkedinUrl} target="_blank" rel="noopener noreferrer">
-                        View Profile
-                      </a>
-                    </p>
-                  )}
-
-                  {/* Application Status Display */}
-                  {student.applicationStatus && (
-                    <div style={{ margin: '10px 0' }}>
-                      <span 
-                        className={`btn ${
-                          student.applicationStatus === 'selected' ? 'status-selected' : 
-                          student.applicationStatus === 'rejected' ? 'status-rejected' : 
-                          'status-pending'
-                        }`}
-                        style={{ fontSize: '12px', padding: '4px 8px' }}
-                      >
-                        {student.applicationStatus === 'selected' ? '✅ SELECTED' :
-                         student.applicationStatus === 'rejected' ? '❌ REJECTED' :
-                         student.applicationStatus === 'on-hold' ? '⏸️ ON HOLD' :
-                         '🕰️ PENDING'}
-                      </span>
-                      {student.interviewScore && (
-                        <span style={{ marginLeft: '10px', fontSize: '14px', fontWeight: 'bold' }}>
-                          Score: {student.interviewScore}/100
-                        </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {filteredApplications.map((application) => (
+                <div key={application._id} className="card" style={{ 
+                  border: '2px solid #ecf0f1', 
+                  borderRadius: '12px',
+                  padding: '20px',
+                  backgroundColor: '#fdfdfd'
+                }}>
+                  <div className="grid grid-3">
+                    {/* Student Info */}
+                    <div>
+                      <h4 style={{ color: '#2c3e50', margin: '0 0 10px 0' }}>
+                        👤 {application.student.firstName} {application.student.lastName}
+                      </h4>
+                      <p><strong>📝 Reg No:</strong> {application.student.registerNumber}</p>
+                      <p><strong>🏫 Dept:</strong> {application.student.department} - {application.student.section}</p>
+                      <p><strong>📊 CGPA:</strong> {application.student.cgpa} | <strong>📚 Backlogs:</strong> {application.student.backlogs}</p>
+                    </div>
+                    
+                    {/* Job Info */}
+                    <div>
+                      <h4 style={{ color: '#8e44ad', margin: '0 0 10px 0' }}>
+                        💼 {application.job.title}
+                      </h4>
+                      <p><strong>🏢 Company:</strong> {application.job.company}</p>
+                      <p><strong>📅 Applied:</strong> {new Date(application.appliedAt).toLocaleDateString()}</p>
+                      {application.interviewScore && (
+                        <p><strong>🏆 Score:</strong> {application.interviewScore}/100</p>
                       )}
                     </div>
-                  )}
-
-                  <div style={{ marginTop: '15px' }}>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => window.location.href = `/interviewer/student/${student._id}?jobId=${selectedJob}`}
-                      style={{ marginRight: '10px' }}
-                    >
-                      View Details
-                    </button>
-                    <button 
-                      className="btn"
-                      onClick={() => window.location.href = `/interviewer/messages?studentId=${student._id}`}
-                      style={{ backgroundColor: '#28a745', color: 'white' }}
-                    >
-                      Message
-                    </button>
+                    
+                    {/* Status & Actions */}
+                    <div>
+                      <div style={{ marginBottom: '15px' }}>
+                        <span 
+                          className={`btn ${
+                            application.status === 'selected' ? 'status-selected' : 
+                            application.status === 'rejected' ? 'status-rejected' : 
+                            'status-pending'
+                          }`}
+                          style={{ fontSize: '14px', padding: '6px 12px', fontWeight: 'bold' }}
+                        >
+                          {application.status === 'selected' ? '✅ SELECTED' :
+                           application.status === 'rejected' ? '❌ REJECTED' :
+                           application.status === 'on-hold' ? '⏸️ ON HOLD' :
+                           '⏳ PENDING'}
+                        </span>
+                      </div>
+                      
+                      {/* Quick Actions */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <button 
+                          className="btn btn-primary"
+                          onClick={() => window.location.href = `/interviewer/student/${application.student._id}?jobId=${application.job._id}`}
+                          style={{ fontSize: '12px', padding: '6px 12px' }}
+                        >
+                          📋 Review & Rate
+                        </button>
+                        
+                        <button 
+                          className="btn"
+                          onClick={() => window.location.href = `/interviewer/messages?studentId=${application.student._id}`}
+                          style={{ backgroundColor: '#27ae60', color: 'white', fontSize: '12px', padding: '6px 12px' }}
+                        >
+                          💬 Message
+                        </button>
+                        
+                        {application.status === 'pending' && (
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button 
+                              className="btn"
+                              onClick={() => quickUpdateStatus(application._id, 'selected')}
+                              style={{ backgroundColor: '#27ae60', color: 'white', fontSize: '10px', padding: '4px 8px', flex: 1 }}
+                            >
+                              ✅ Select
+                            </button>
+                            <button 
+                              className="btn"
+                              onClick={() => quickUpdateStatus(application._id, 'rejected')}
+                              style={{ backgroundColor: '#e74c3c', color: 'white', fontSize: '10px', padding: '4px 8px', flex: 1 }}
+                            >
+                              ❌ Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  
+                  {application.feedback && (
+                    <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#e8f5e8', borderRadius: '6px' }}>
+                      <strong>💬 Feedback:</strong> {application.feedback}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

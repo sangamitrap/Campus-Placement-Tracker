@@ -127,3 +127,61 @@ export const updateApplicationStatus = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const getAllApplications = async (req, res) => {
+  try {
+    const { jobId, status } = req.query;
+    
+    let query = {};
+    if (jobId) query.job = jobId;
+    if (status) query.status = status;
+
+    const applications = await Application.find(query)
+      .populate('student', 'firstName lastName email registerNumber department section cgpa backlogs skills')
+      .populate('job', 'title company location')
+      .sort({ appliedAt: -1 });
+
+    res.json(applications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const quickUpdateStatus = async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { status } = req.body;
+
+    const application = await Application.findByIdAndUpdate(
+      applicationId,
+      { 
+        status, 
+        updatedBy: req.user._id, 
+        lastUpdated: new Date() 
+      },
+      { new: true }
+    ).populate('job', 'title company').populate('student', 'firstName lastName');
+
+    if (!application) return res.status(404).json({ message: 'Application not found' });
+
+    // Create notification
+    const statusMessages = {
+      selected: `🎉 Congratulations! You have been selected for ${application.job.title} at ${application.job.company}.`,
+      rejected: `📋 Your application for ${application.job.title} at ${application.job.company} was not successful this time.`,
+      'on-hold': `⏳ Your application for ${application.job.title} at ${application.job.company} is currently on hold.`
+    };
+
+    if (statusMessages[status]) {
+      await Notification.create({
+        recipient: application.student._id,
+        message: statusMessages[status],
+        type: 'status_update',
+        relatedJob: application.job._id
+      });
+    }
+
+    res.json({ message: 'Status updated successfully', application });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
